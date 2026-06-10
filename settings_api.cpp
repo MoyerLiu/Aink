@@ -1,0 +1,121 @@
+#include "settings_api.h"
+
+#include "app_locale.h"
+
+#include <Preferences.h>
+#include <WiFi.h>
+
+#include <Arduino.h>
+#include <stdio.h>
+
+#define PREFS_NAMESPACE       "epaper"
+#define PREFS_KEY_SSID        "ssid"
+#define PREFS_KEY_PASS        "pass"
+#define PREFS_KEY_FORCE_PORTAL "force_portal"
+#define PREFS_KEY_MODEL        "model"
+#define PREFS_KEY_LANGUAGE     "lang"
+#define PREFS_DEFAULT_MODEL    "Default"
+
+void settings_api_get_wifi_ssid(char *out, size_t outLen) {
+  if (out == nullptr || outLen == 0) {
+    return;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    snprintf(out, outLen, "%s", WiFi.SSID().c_str());
+    return;
+  }
+
+  Preferences prefs;
+  prefs.begin(PREFS_NAMESPACE, true);
+  const String stored = prefs.getString(PREFS_KEY_SSID, "");
+  prefs.end();
+  snprintf(out, outLen, "%s", stored.c_str());
+}
+
+void settings_api_get_ip(char *out, size_t outLen) {
+  if (out == nullptr || outLen == 0) {
+    return;
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    snprintf(out, outLen, "--");
+    return;
+  }
+
+  snprintf(out, outLen, "%s", WiFi.localIP().toString().c_str());
+}
+
+bool settings_api_is_wifi_connected(void) {
+  return WiFi.status() == WL_CONNECTED;
+}
+
+void settings_api_get_model_name(char *out, size_t outLen) {
+  if (out == nullptr || outLen == 0) {
+    return;
+  }
+
+  Preferences prefs;
+  prefs.begin(PREFS_NAMESPACE, true);
+  const String model = prefs.getString(PREFS_KEY_MODEL, PREFS_DEFAULT_MODEL);
+  prefs.end();
+  snprintf(out, outLen, "%s", model.c_str());
+}
+
+AppLanguage settings_api_get_language(void) {
+  Preferences prefs;
+  prefs.begin(PREFS_NAMESPACE, true);
+  const uint8_t stored = prefs.getUChar(PREFS_KEY_LANGUAGE, (uint8_t)APP_LANG_EN);
+  prefs.end();
+  return stored == (uint8_t)APP_LANG_ZH ? APP_LANG_ZH : APP_LANG_EN;
+}
+
+void settings_api_set_language(AppLanguage lang) {
+  const uint8_t value = (lang == APP_LANG_ZH) ? (uint8_t)APP_LANG_ZH : (uint8_t)APP_LANG_EN;
+  Preferences prefs;
+  prefs.begin(PREFS_NAMESPACE, false);
+  prefs.putUChar(PREFS_KEY_LANGUAGE, value);
+  prefs.end();
+}
+
+static void write_force_portal_flag(void) {
+  Preferences prefs;
+  prefs.begin(PREFS_NAMESPACE, false);
+  prefs.putBool(PREFS_KEY_FORCE_PORTAL, true);
+  prefs.end();
+}
+
+void settings_api_request_portal_restart(void) {
+  Serial.println("[Settings] restart -> WiFi portal");
+  write_force_portal_flag();
+  delay(200);
+  ESP.restart();
+}
+
+void settings_api_forget_wifi_and_restart(void) {
+  Serial.println("[Settings] forget WiFi and restart");
+  Preferences prefs;
+  prefs.begin(PREFS_NAMESPACE, false);
+  prefs.remove(PREFS_KEY_SSID);
+  prefs.remove(PREFS_KEY_PASS);
+  prefs.putBool(PREFS_KEY_FORCE_PORTAL, true);
+  prefs.end();
+  delay(200);
+  ESP.restart();
+}
+
+bool settings_api_consume_force_portal_boot(void) {
+  Preferences prefs;
+  prefs.begin(PREFS_NAMESPACE, true);
+  const bool forcePortal = prefs.getBool(PREFS_KEY_FORCE_PORTAL, false);
+  prefs.end();
+  if (!forcePortal) {
+    return false;
+  }
+
+  prefs.begin(PREFS_NAMESPACE, false);
+  prefs.remove(PREFS_KEY_FORCE_PORTAL);
+  prefs.end();
+  Serial.println("[Settings] force portal boot flag consumed");
+  return true;
+}

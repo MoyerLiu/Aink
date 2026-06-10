@@ -1,0 +1,144 @@
+#include "ui_nav.h"
+
+#include "app_locale.h"
+#include "ui_home.h"
+#include "ui_settings.h"
+#include "ui_weather.h"
+
+#include <Arduino.h>
+#include <stdio.h>
+
+static bool s_onHome = true;
+static bool s_voiceListening = false;
+
+void ui_nav_init(void) {
+  s_onHome = true;
+  s_voiceListening = false;
+  ui_home_show();
+}
+
+bool ui_nav_is_home(void) {
+  return s_onHome;
+}
+
+bool ui_nav_is_weather(void) {
+  return !s_onHome && ui_weather_is_active();
+}
+
+bool ui_nav_is_settings(void) {
+  return !s_onHome && ui_settings_is_active();
+}
+
+static void open_focused_tile(void) {
+  const int focus = ui_home_get_focus();
+  if (focus == 0) {
+    ui_weather_show();
+  } else if (focus == 3) {
+    ui_settings_show();
+  } else {
+    ui_detail_show(ui_home_focus_title(), app_tr(TR_COMING_SOON));
+  }
+  s_onHome = false;
+}
+
+bool ui_nav_handle(BtnAction action, UiRefreshMode *outRefreshMode) {
+  if (outRefreshMode != nullptr) {
+    *outRefreshMode = UI_REFRESH_NONE;
+  }
+  if (action == BTN_ACTION_NONE) {
+    return false;
+  }
+
+  if (s_onHome) {
+    switch (action) {
+      case BTN_ACTION_NEXT:
+        ui_home_next_focus(nullptr);
+        if (outRefreshMode != nullptr) {
+          *outRefreshMode = UI_REFRESH_FAST;
+        }
+        return true;
+      case BTN_ACTION_PREV:
+        ui_home_prev_focus(nullptr);
+        if (outRefreshMode != nullptr) {
+          *outRefreshMode = UI_REFRESH_FAST;
+        }
+        return true;
+      case BTN_ACTION_CONFIRM:
+        open_focused_tile();
+        if (outRefreshMode != nullptr) {
+          *outRefreshMode = UI_REFRESH_NAV;
+        }
+        return true;
+      case BTN_ACTION_BACK:
+        return false;
+      case BTN_ACTION_VOICE_TOGGLE:
+        s_voiceListening = !s_voiceListening;
+        Serial.printf("[Voice] listening=%s (stub)\n", s_voiceListening ? "on" : "off");
+        return false;
+      default:
+        return false;
+    }
+  }
+
+  if (ui_settings_is_active()) {
+    switch (action) {
+      case BTN_ACTION_NEXT:
+        ui_settings_next_row();
+        if (outRefreshMode != nullptr) {
+          *outRefreshMode = UI_REFRESH_FAST;
+        }
+        return true;
+      case BTN_ACTION_PREV:
+        ui_settings_prev_row();
+        if (outRefreshMode != nullptr) {
+          *outRefreshMode = UI_REFRESH_FAST;
+        }
+        return true;
+      case BTN_ACTION_CONFIRM: {
+        const SettingsActivateResult act = ui_settings_activate();
+        if (act == SETTINGS_ACT_RESTART) {
+          return true;
+        }
+        if (outRefreshMode != nullptr) {
+          *outRefreshMode = UI_REFRESH_NAV;
+        }
+        return true;
+      }
+      case BTN_ACTION_BACK:
+        if (ui_settings_back()) {
+          if (outRefreshMode != nullptr) {
+            *outRefreshMode = UI_REFRESH_NAV;
+          }
+          return true;
+        }
+        ui_home_show();
+        s_onHome = true;
+        if (outRefreshMode != nullptr) {
+          *outRefreshMode = UI_REFRESH_NAV;
+        }
+        return true;
+      case BTN_ACTION_VOICE_TOGGLE:
+        s_voiceListening = !s_voiceListening;
+        Serial.printf("[Voice] listening=%s (stub)\n", s_voiceListening ? "on" : "off");
+        return false;
+      default:
+        return false;
+    }
+  }
+
+  switch (action) {
+    case BTN_ACTION_BACK:
+      ui_home_show();
+      s_onHome = true;
+      if (outRefreshMode != nullptr) {
+        *outRefreshMode = UI_REFRESH_NAV;
+      }
+      return true;
+    case BTN_ACTION_VOICE_TOGGLE:
+      s_voiceListening = !s_voiceListening;
+      Serial.printf("[Voice] listening=%s (stub)\n", s_voiceListening ? "on" : "off");
+      return false;
+    default:
+      return false;
+  }
+}

@@ -1,0 +1,31 @@
+# Arduino / ESP32 build artifacts
+build/
+*.hex
+*.elf
+*.bin
+*.map
+*.o
+*.a
+
+# IDE / editor
+.theia/
+.vscode/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local font sources (generated aink_*.c is committed)
+tools/fonts/
+*.ttf
+*.otf
+*.woff
+*.woff2
+
+# Secrets / local config
+.env
+.env.*
+credentials.json
+secrets.h

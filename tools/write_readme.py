@@ -1,4 +1,8 @@
-# Aink
+#!/usr/bin/env python3
+"""Write README.md with UTF-8 encoding."""
+from pathlib import Path
+
+README = """# Aink
 
 Aink is a 2x2 app platform for **Seeed XIAO ESP32-S3** + **Waveshare 1.54 inch B&W e-paper** (200x200). It ships with WiFi provisioning, LVGL UI, button navigation, tiered e-paper refresh, and pluggable mini-apps.
 
@@ -99,3 +103,14 @@ tools/                Icon/font tooling
 ## License
 
 MIT — see `LICENSE`. Waveshare EPD driver files retain their original header terms.
+"""
+
+
+def main() -> None:
+    path = Path(__file__).resolve().parent.parent / "README.md"
+    path.write_text(README, encoding="utf-8", newline="\n")
+    print(f"Wrote {path}")
+
+
+if __name__ == "__main__":
+    main()

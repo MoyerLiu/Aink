@@ -1,0 +1,99 @@
+#ifndef WEATHER_METRICS_ICONS_H
+#define WEATHER_METRICS_ICONS_H
+
+#include <stdint.h>
+
+#define METRIC_ICON_SIZE 10
+
+enum MetricIconKind {
+  METRIC_ICON_HUMIDITY,
+  METRIC_ICON_UV,
+  METRIC_ICON_WIND,
+  METRIC_ICON_PRESSURE,
+  METRIC_ICON_AQI,
+  METRIC_ICON_SUNRISE,
+  METRIC_ICON_COUNT
+};
+
+static const uint16_t metric_icon_bitmaps[METRIC_ICON_COUNT][METRIC_ICON_SIZE] = {
+  /* humidity — droplet */
+  {
+    0b0000011000,
+    0b0000111100,
+    0b0001111100,
+    0b0001111100,
+    0b0000111100,
+    0b0000011000,
+    0b0000001000,
+    0b0000000000,
+    0b0000000000,
+    0b0000000000,
+  },
+  /* uv — sun */
+  {
+    0b0000101000,
+    0b0000101000,
+    0b0010001000,
+    0b0000111000,
+    0b1110111011,
+    0b0000111000,
+    0b0010001000,
+    0b0000101000,
+    0b0000101000,
+    0b0000000000,
+  },
+  /* wind — arrow */
+  {
+    0b0000000000,
+    0b0000001000,
+    0b0000001000,
+    0b0000111110,
+    0b1111111111,
+    0b0000111110,
+    0b0000001000,
+    0b0000001000,
+    0b0000000000,
+    0b0000000000,
+  },
+  /* pressure — gauge */
+  {
+    0b0000111000,
+    0b0001000100,
+    0b0010000010,
+    0b0100000001,
+    0b0100000001,
+    0b0010000010,
+    0b0001000100,
+    0b0000111000,
+    0b0000010000,
+    0b0000000000,
+  },
+  /* aqi — badge */
+  {
+    0b0111111110,
+    0b1000000001,
+    0b1011111101,
+    0b1010000101,
+    0b1011111101,
+    0b1010000101,
+    0b1011111101,
+    0b1000000001,
+    0b0111111110,
+    0b0000000000,
+  },
+  /* sunrise — sun on horizon */
+  {
+    0b0000011000,
+    0b0000111100,
+    0b0001111100,
+    0b0000111100,
+    0b1111111111,
+    0b0000000000,
+    0b0000000000,
+    0b0000000000,
+    0b0000000000,
+    0b0000000000,
+  },
+};
+
+#endif
