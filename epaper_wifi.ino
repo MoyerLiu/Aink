@@ -644,7 +644,7 @@ static void drawStatusBarRegion(UBYTE *image, int batteryPercent, bool wifiConne
   const UWORD barLineY = 19;
   const UWORD dateX = 18;
   UWORD weatherIconX = 118;
-  const UWORD weatherIconY = barY + 2;
+  const UWORD weatherIconY = barY - 1;
   UWORD weatherTempX = 134;
   const UWORD battIconX = EPD_1IN54_V2_WIDTH - 15;
 
