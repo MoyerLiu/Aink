@@ -156,7 +156,7 @@ static void drawText(UBYTE *image, const char *text, UWORD x, UWORD y) {
 
 static void buildPortalApSsid() {
   const uint64_t chipId = ESP.getEfuseMac();
-  snprintf(portalApSsid, sizeof(portalApSsid), "Epaper-%04X", (uint16_t)(chipId & 0xFFFF));
+  snprintf(portalApSsid, sizeof(portalApSsid), "Aink-%04X", (uint16_t)(chipId & 0xFFFF));
 }
 
 static bool loadStoredWiFiCredentials(String &outSsid, String &outPass) {
@@ -753,7 +753,7 @@ static void refreshMainUiOnDisplay(UiRefreshMode mode) {
 void setup() {
   Serial.begin(115200);
   delay(500);
-  Serial.println("\n=== epaper wifi ===");
+  Serial.println("\n=== Aink ===");
 
   DEV_Module_Init();
 
