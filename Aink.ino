@@ -17,7 +17,6 @@
 #include "ui_refresh.h"
 #include "settings_api.h"
 #include "app_locale.h"
-#include "camera_service.h"
 
 extern "C" {
 #include "qrcode.h"
@@ -502,12 +501,6 @@ static void startNormalOperation() {
   epaper_set_portal_mirror(false);
   if (WiFi.status() == WL_CONNECTED) {
     syncNetworkTime();
-  }
-
-  if (camera_service_init()) {
-    Serial.println("[Camera] initialized");
-  } else {
-    Serial.println("[Camera] unavailable (no module or init error)");
   }
 
   Serial.println("[EPD] full clear (~25s)...");
