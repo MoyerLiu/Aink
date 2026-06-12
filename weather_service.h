@@ -37,6 +37,7 @@ typedef struct {
 
 void weather_service_reset(void);
 void weather_service_update(bool force);
+bool weather_service_consume_fresh_fetch(void);
 void weather_service_get_snapshot(WeatherSnapshot *out);
 
 WeatherIconKind weather_service_wmo_to_icon(int wmo);

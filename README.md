@@ -49,7 +49,7 @@ Boot log should show `[Camera] ready (240x240 JPEG)` and non-zero `freePsram`.
 
 - Register at [console.qweather.com](https://console.qweather.com) — copy **API Key** and **API Host** (project-specific, e.g. `xxx.re.qweatherapi.com`; no `https://` prefix).
 - Configure via captive portal (**天气 API** card) or **Settings → WiFi → Configure Weather**.
-- Flow: IP geolocation (`ip-api.com`, HTTP) → QWeather geo lookup (LocationID) → `/v7/weather/now`, `/v7/weather/7d`, `/v7/air/now`, `/v7/indices/1d` on your API Host (HTTPS).
+- Flow: IP geolocation (`ip-api.com`, HTTP) → QWeather geo lookup (LocationID) → `/v7/weather/now`, `/airquality/v1/current/{lat}/{lon}`, `/v7/weather/7d` (includes `uvIndex` for today), optional UV indices fallback on your API Host (HTTPS).
 - Auth: **`X-QW-Api-Key` header** (not `key=` in URL). Responses are **gzip-compressed**; firmware decompresses with embedded **`puff.c`** (no system `zlib.h`).
 - Detail page shows **city** (`adm2`), not district. Three-day row shows **tomorrow, day after, and day after that** (today excluded).
 - Refreshes every 30 minutes when WiFi is connected.
@@ -172,6 +172,7 @@ tools/                Font/icons/API test scripts
 | `[Weather] QWeather key/host not configured` | Settings → WiFi → Configure Weather, or portal **天气 API** card |
 | `[Weather] now HTTP -1` | WiFi; API Host (no `https://`) and Key at [console.qweather.com](https://console.qweather.com) |
 | `[Weather] QWeather code=401/403` | Key invalid or Host does not match project; use console Host, not legacy `devapi.qweather.com` |
+| `[Weather] air request failed` / `air parse failed` | Air Quality uses `/airquality/v1/current/{lat}/{lon}` (not legacy `/v7/air/now`); confirm your QWeather plan includes Air Quality API |
 | `[Weather] gzip …` missing / parse failed | Reflash latest firmware (`puff.c` + `weather_gzip.cpp` in sketch) |
 | `undefined reference to puff` | Clean build (Sketch → Clean All); ensure `puff.c` and `puff.h` are in sketch folder |
 | `provider unsupported` | MiMo unsupported model → use **v2.5** / **v2-omni** |

@@ -532,8 +532,6 @@ static void startNormalOperation() {
   ui_lvgl_prepare();
 
   refreshMainUiOnDisplay(UI_REFRESH_FULL);
-  weather_service_update(true);
-  refreshMainUiOnDisplay(UI_REFRESH_QUALITY);
 }
 
 static void drawWifiIcon(UBYTE *image, UWORD ox, UWORD oy, bool connected) {
@@ -753,7 +751,6 @@ static void refreshMainUiOnDisplay(UiRefreshMode mode) {
   const bool fullLvgl = (mode != UI_REFRESH_FAST);
 
   if (mode == UI_REFRESH_QUALITY || mode == UI_REFRESH_FULL) {
-    weather_service_update(fullInit);
     if (ui_nav_is_weather()) {
       ui_weather_refresh();
     } else if (ui_nav_is_home()) {
@@ -833,6 +830,10 @@ void loop() {
   }
 
   weather_service_update(false);
+
+  if (weather_service_consume_fresh_fetch()) {
+    refreshMainUiOnDisplay(UI_REFRESH_QUALITY);
+  }
 
   btn_input_update();
   btn_input_serial_poll();

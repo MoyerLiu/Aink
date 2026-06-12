@@ -57,12 +57,20 @@ bool weather_gzip_decompress(String *body) {
   }
 
   unsigned long srcLen = static_cast<unsigned long>(body->length() - hdr - 8);
-  unsigned long destLen = srcLen * 8;
+  unsigned long destLen = srcLen * 4;
   if (destLen < 4096) {
     destLen = 4096;
   }
-  if (destLen > 65536) {
-    destLen = 65536;
+
+  const size_t freeBlock = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+  unsigned long maxDest = 65536;
+  if (freeBlock > 8192) {
+    maxDest = static_cast<unsigned long>((freeBlock * 3) / 4);
+  } else if (freeBlock > 2048) {
+    maxDest = static_cast<unsigned long>(freeBlock - 512);
+  }
+  if (destLen > maxDest) {
+    destLen = maxDest;
   }
 
   uint8_t *dest = static_cast<uint8_t *>(
