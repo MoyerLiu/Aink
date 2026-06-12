@@ -248,6 +248,29 @@ void EPD_1IN54_V2_Init_Partial(void)
     EPD_1IN54_V2_ReadBusy("partial-init-power");
 }
 
+void EPD_1IN54_V2_Enter_Partial(void)
+{
+    EPD_1IN54_V2_SetLut(WF_PARTIAL_1IN54_0);
+    EPD_1IN54_V2_SendCommand(0x37);
+    EPD_1IN54_V2_SendData(0x00);
+    EPD_1IN54_V2_SendData(0x00);
+    EPD_1IN54_V2_SendData(0x00);
+    EPD_1IN54_V2_SendData(0x00);
+    EPD_1IN54_V2_SendData(0x00);
+    EPD_1IN54_V2_SendData(0x40);
+    EPD_1IN54_V2_SendData(0x00);
+    EPD_1IN54_V2_SendData(0x00);
+    EPD_1IN54_V2_SendData(0x00);
+
+    EPD_1IN54_V2_SendCommand(0x3C);
+    EPD_1IN54_V2_SendData(0x80);
+
+    EPD_1IN54_V2_SendCommand(0x22);
+    EPD_1IN54_V2_SendData(0xc0);
+    EPD_1IN54_V2_SendCommand(0x20);
+    EPD_1IN54_V2_ReadBusy("partial-enter-power");
+}
+
 void EPD_1IN54_V2_Clear(void)
 {
     UWORD Width, Height;
@@ -316,6 +339,17 @@ void EPD_1IN54_V2_DisplayPart(UBYTE *Image)
     EPD_1IN54_V2_SendCommand(0x24);
     EPD_1IN54_V2_SendDataBuffer(Image, Width * Height);
     EPD_1IN54_V2_TurnOnDisplayPart();
+}
+
+void EPD_1IN54_V2_LoadPartOldImage(UBYTE *Image)
+{
+    UWORD Width, Height;
+    Width = (EPD_1IN54_V2_WIDTH % 8 == 0) ? (EPD_1IN54_V2_WIDTH / 8) : (EPD_1IN54_V2_WIDTH / 8 + 1);
+    Height = EPD_1IN54_V2_HEIGHT;
+
+    EPD_1IN54_V2_SetCursor(0, EPD_1IN54_V2_HEIGHT - 1);
+    EPD_1IN54_V2_SendCommand(0x26);
+    EPD_1IN54_V2_SendDataBuffer(Image, Width * Height);
 }
 
 void EPD_1IN54_V2_Sleep(void)

@@ -30,7 +30,6 @@ extern "C" {
 #define STATUS_BAR_HEIGHT        20
 
 // WiFi 配网
-#define WIFI_CONNECT_TIMEOUT_MS  20000
 #define WIFI_PORTAL_DNS_PORT     53
 #define PREFS_NAMESPACE          "epaper"
 #define PREFS_KEY_SSID           "ssid"
@@ -177,6 +176,12 @@ static bool loadStoredWiFiCredentials(String &outSsid, String &outPass) {
   outPass = devicePrefs.getString(PREFS_KEY_PASS, "");
   devicePrefs.end();
   return outSsid.length() > 0;
+}
+
+static bool hasStoredWiFiCredentials() {
+  String storedSsid;
+  String storedPass;
+  return loadStoredWiFiCredentials(storedSsid, storedPass);
 }
 
 static void saveStoredWiFiCredentials(const String &ssid, const String &pass) {
@@ -508,14 +513,14 @@ static void enterPortalMode() {
 static void startNormalOperation() {
   portalModeActive = false;
   epaper_set_portal_mirror(false);
-  if (WiFi.status() == WL_CONNECTED) {
-    syncNetworkTime();
-  }
 
   Serial.println("[EPD] full clear (~25s)...");
   EPD_1IN54_V2_Init();
   EPD_1IN54_V2_Clear();
   Serial.println("[EPD] clear done");
+  EPD_1IN54_V2_Enter_Partial();
+  epaper_mark_partial_ready();
+  Serial.println("[EPD] partial ready after white clear");
 
   lastDisplayedMinute = -1;
   lastWifiState = -1;
@@ -533,7 +538,7 @@ static void startNormalOperation() {
   ui_nav_init();
   ui_lvgl_prepare();
 
-  refreshMainUiOnDisplay(UI_REFRESH_FULL);
+  refreshMainUiOnDisplay(UI_REFRESH_NAV);
 }
 
 static void drawWifiIcon(UBYTE *image, UWORD ox, UWORD oy, bool connected) {
@@ -899,10 +904,11 @@ void setup() {
   if (settings_api_consume_force_portal_boot()) {
     Serial.println("[WiFi] Entering config portal (settings request)");
     enterPortalMode();
-  } else if (tryConnectStoredWiFi(WIFI_CONNECT_TIMEOUT_MS)) {
+  } else if (hasStoredWiFiCredentials()) {
+    Serial.println("[WiFi] Stored credentials found; showing UI before network bootstrap");
     startNormalOperation();
   } else {
-    Serial.println("[WiFi] Entering config portal");
+    Serial.println("[WiFi] No stored credentials; entering config portal");
     enterPortalMode();
   }
 }
@@ -971,8 +977,9 @@ void loop() {
       Serial.printf("[WiFi] Reconnect failed (%d/%d)\n",
                     wifiReconnectFailures, WIFI_RECONNECT_MAX_FAIL);
       if (wifiReconnectFailures >= WIFI_RECONNECT_MAX_FAIL) {
-        Serial.println("[WiFi] Restarting into config portal");
-        ESP.restart();
+        Serial.println("[WiFi] Entering config portal after reconnect failures");
+        enterPortalMode();
+        return;
       }
     } else {
       syncNetworkTime();

@@ -67,6 +67,22 @@ bool epaper_is_partial_ready(void) {
   return s_epaperPartialReady;
 }
 
+void epaper_mark_partial_ready(void) {
+  s_epaperPartialReady = true;
+}
+
+static void mirrorLogicalXInPlace(void) {
+  for (UWORD top = 0, bottom = EPD_1IN54_V2_HEIGHT - 1; top < bottom; top++, bottom--) {
+    for (UWORD col = 0; col < kRowBytes; col++) {
+      const UWORD topIndex = top * kRowBytes + col;
+      const UWORD bottomIndex = bottom * kRowBytes + col;
+      const UBYTE tmp = s_blackImage[topIndex];
+      s_blackImage[topIndex] = s_blackImage[bottomIndex];
+      s_blackImage[bottomIndex] = tmp;
+    }
+  }
+}
+
 void epaper_upload(bool fullRefresh) {
   epaper_upload_mode(fullRefresh, false);
 }
@@ -81,10 +97,9 @@ void epaper_upload_mode(bool fullInit, bool fastPartial) {
     return;
   }
 
-  if (fastPartial) {
-    EPD_1IN54_V2_DisplayPart(s_blackImage);
-    return;
-  }
-
-  EPD_1IN54_V2_DisplayPartBaseImage(s_blackImage);
+  (void)fastPartial;
+  mirrorLogicalXInPlace();
+  EPD_1IN54_V2_DisplayPart(s_blackImage);
+  EPD_1IN54_V2_LoadPartOldImage(s_blackImage);
+  mirrorLogicalXInPlace();
 }
