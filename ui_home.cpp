@@ -96,24 +96,7 @@ static void canvas_set_settings_icon(lv_obj_t *canvas) {
 }
 
 static void canvas_set_stock_icon(lv_obj_t *canvas) {
-  const int size = SETTINGS_TILE_ICON_PX;
-  for (int row = 0; row < size; row++) {
-    for (int col = 0; col < size; col++) {
-      bool black = false;
-      if (row == size - 4 && col >= 4 && col <= size - 4) {
-        black = true;
-      }
-      if (col >= 6 && col <= size - 6) {
-        const int baseline = size - 4;
-        const int trendY = baseline - ((col - 6) * (size - 12)) / (size - 12);
-        if (row == trendY || row == trendY - 1) {
-          black = true;
-        }
-      }
-      lv_canvas_set_px(canvas, col, row,
-                       black ? lv_color_black() : lv_color_white());
-    }
-  }
+  canvas_set_bitmap_icon(canvas, SETTINGS_TILE_ICON_PX, stock_chart_bitmap);
 }
 
 static void format_stock_change(int changePctX10, char *out, size_t outLen) {

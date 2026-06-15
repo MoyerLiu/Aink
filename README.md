@@ -143,7 +143,7 @@ python tools/png_to_tile_icons.py
 ```
 
 - Weather icons: rasterize `wi-*.svg` → `weather_icons.h` (16×16).
-- Launcher icons: place **`gear.png`** and **`eye.png`** in the sketch root (local only; gitignored), run `png_to_tile_icons.py` → `settings_icons.h` (32×32 outline bitmaps for Settings and AI Vision tiles).
+- Launcher icons: **`stock.svg`** is committed; place **`gear.png`** and **`eye.png`** in the sketch root (local only; gitignored). Run `png_to_tile_icons.py` → `settings_icons.h` (32×32 outline bitmaps for all launcher tiles).
 
 ## Project layout
 
@@ -162,7 +162,7 @@ settings_api.*        NVS (WiFi, language, AI key, QWeather key/host)
 weather_service.*     QWeather fetch, parse, icon mapping
 weather_gzip.*          Gzip decompress wrapper (uses puff)
 puff.c / puff.h         Embedded deflate decompressor (public domain)
-settings_icons.h      Launcher gear + eye bitmaps (generated)
+settings_icons.h      Launcher gear, eye, and stock bitmaps (generated)
 aink_3500_12/14.c     LVGL CJK fonts (~3500 chars)
 tools/                Font/icons/API test scripts
 ```
