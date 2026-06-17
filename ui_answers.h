@@ -4,14 +4,12 @@
 #include <lvgl.h>
 #include <stdbool.h>
 
-#include "btn_input.h"
 #include "ui_refresh.h"
 
 void ui_answers_init(void);
 void ui_answers_show(void);
 void ui_answers_leave(void);
 void ui_answers_refresh(void);
-void ui_answers_refresh_locale(void);
 bool ui_answers_is_active(void);
 bool ui_answers_is_busy(void);
 

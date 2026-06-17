@@ -2,6 +2,7 @@
 
 #include "app_locale.h"
 #include "clock_format.h"
+#include "weather_icons.h"
 #include "weather_service.h"
 #include "stock_service.h"
 #include "settings_icons.h"
@@ -60,6 +61,23 @@ static void style_tile_text(lv_obj_t *label) {
   lv_obj_set_style_text_font(label, UI_FONT_SM, LV_PART_MAIN);
 }
 
+static void canvas_set_weather_icon(lv_obj_t *canvas, WeatherIconKind kind) {
+  if ((unsigned)kind >= WEATHER_ICON_COUNT) {
+    kind = WEATHER_ICON_CLOUDY;
+  }
+
+  for (int row = 0; row < TILE_ICON_PX; row++) {
+    const int srcRow = (row * WEATHER_ICON_SIZE) / TILE_ICON_PX;
+    const uint16_t mask = weather_icon_bitmaps[kind][srcRow];
+    for (int col = 0; col < TILE_ICON_PX; col++) {
+      const int srcCol = (col * WEATHER_ICON_SIZE) / TILE_ICON_PX;
+      const bool black = (mask >> (WEATHER_ICON_SIZE - 1 - srcCol)) & 0x01;
+      lv_canvas_set_px(canvas, col, row,
+                       black ? lv_color_black() : lv_color_white());
+    }
+  }
+}
+
 static void canvas_set_bitmap_icon(lv_obj_t *canvas, const uint32_t *bitmap) {
   for (int row = 0; row < TILE_ICON_PX; row++) {
     const uint32_t mask = bitmap[row];
@@ -101,12 +119,13 @@ static void bind_clock_slot(int slot) {
 static void bind_weather_slot(int slot) {
   WeatherSnapshot snap = {};
   weather_service_get_snapshot(&snap);
-  canvas_set_bitmap_icon(s_iconCanvas[slot], weather_app_bitmap);
 
   char tempLine[8];
   if (snap.valid) {
+    canvas_set_weather_icon(s_iconCanvas[slot], snap.icon);
     snprintf(tempLine, sizeof(tempLine), "%dC", snap.tempC);
   } else {
+    canvas_set_weather_icon(s_iconCanvas[slot], WEATHER_ICON_CLOUDY);
     snprintf(tempLine, sizeof(tempLine), "--");
   }
   lv_label_set_text(s_subLabels[slot], tempLine);
@@ -118,8 +137,8 @@ static void bind_vision_slot(int slot) {
 }
 
 static void bind_book_slot(int slot) {
-  canvas_set_bitmap_icon(s_iconCanvas[slot], answerbook_bitmap);
-  lv_label_set_text(s_subLabels[slot], app_tr(TR_ANSWERBOOK_HINT));
+  canvas_set_bitmap_icon(s_iconCanvas[slot], vision_eye_bitmap);
+  lv_label_set_text(s_subLabels[slot], app_tr(TR_BOOK_HINT));
 }
 
 static void bind_stock_slot(int slot) {
@@ -191,45 +210,36 @@ static void sync_home_page(void) {
   }
 }
 
-static void restyle_home_focus(int prevFocus) {
-  if (s_logicalFocus / HOME_SLOTS_PER_PAGE != s_homePage) {
-    return;
-  }
-
-  if (prevFocus / HOME_SLOTS_PER_PAGE == s_homePage) {
-    const int prevSlot = prevFocus % HOME_SLOTS_PER_PAGE;
-    style_tile(s_tiles[prevSlot], s_tileLabels[prevSlot], false);
-    lv_obj_invalidate(s_tiles[prevSlot]);
-  }
-
+static void invalidate_focus_tile(void) {
   const int slot = s_logicalFocus % HOME_SLOTS_PER_PAGE;
-  style_tile(s_tiles[slot], s_tileLabels[slot], true);
-  lv_obj_invalidate(s_tiles[slot]);
+  if (s_logicalFocus / HOME_SLOTS_PER_PAGE == s_homePage) {
+    lv_obj_invalidate(s_tiles[slot]);
+  }
 }
 
 void ui_home_next_focus(int *outPrevFocus) {
   const int prev = s_logicalFocus;
   s_logicalFocus = (s_logicalFocus + 1) % HOME_LOGICAL_COUNT;
-  if (prev / HOME_SLOTS_PER_PAGE == s_logicalFocus / HOME_SLOTS_PER_PAGE) {
-    restyle_home_focus(prev);
-  } else {
-    sync_home_page();
-  }
+  sync_home_page();
   if (outPrevFocus != nullptr) {
     *outPrevFocus = prev;
+  }
+  invalidate_focus_tile();
+  if (prev / HOME_SLOTS_PER_PAGE == s_homePage) {
+    lv_obj_invalidate(s_tiles[prev % HOME_SLOTS_PER_PAGE]);
   }
 }
 
 void ui_home_prev_focus(int *outPrevFocus) {
   const int prev = s_logicalFocus;
   s_logicalFocus = (s_logicalFocus + HOME_LOGICAL_COUNT - 1) % HOME_LOGICAL_COUNT;
-  if (prev / HOME_SLOTS_PER_PAGE == s_logicalFocus / HOME_SLOTS_PER_PAGE) {
-    restyle_home_focus(prev);
-  } else {
-    sync_home_page();
-  }
+  sync_home_page();
   if (outPrevFocus != nullptr) {
     *outPrevFocus = prev;
+  }
+  invalidate_focus_tile();
+  if (prev / HOME_SLOTS_PER_PAGE == s_homePage) {
+    lv_obj_invalidate(s_tiles[prev % HOME_SLOTS_PER_PAGE]);
   }
 }
 

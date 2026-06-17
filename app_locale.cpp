@@ -37,12 +37,6 @@ static const char *kStringsEn[TR_COUNT] = {
     "Book of Answers",
     "Press A to ask",
 
-    "Book of Answers",
-    "Local oracle",
-    "Oracle",
-    "Local Oracle",
-    "Offline Oracle",
-
     "Settings",
     "WiFi",
     "Model",
@@ -134,12 +128,6 @@ static const char *kStringsZh[TR_COUNT] = {
     "提供商不支持",
     "答案之书",
     "短按A求答案",
-
-    "答案之书",
-    "本地问卦",
-    "答案之书",
-    "本地问卦",
-    "离线预言",
 
     "设置",
     "无线",
@@ -253,7 +241,7 @@ void app_locale_refresh_all(void) {
   ui_settings_refresh();
   ui_weather_refresh();
   ui_stock_refresh();
-  ui_answers_refresh_locale();
+  ui_answers_refresh();
   ui_vision_refresh();
   ui_voice_refresh();
   ui_clock_refresh_locale();

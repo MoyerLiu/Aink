@@ -2,7 +2,6 @@
 
 #include "ai_model_config.h"
 #include "app_locale.h"
-#include "bookofanswers.h"
 #include "camera_service.h"
 #include "settings_api.h"
 
@@ -17,7 +16,7 @@
 #include <string.h>
 
 #define VISION_HTTP_TIMEOUT_MS  60000
-#define VISION_BOOK_HTTP_TIMEOUT_MS 30000
+#define VISION_BOOK_HTTP_TIMEOUT_MS 15000
 #define VISION_MAX_JPEG_BYTES   (64 * 1024)
 #define VISION_MAX_TOKENS       1024
 #define VISION_OUTPUT_MAX_CHARS 40
@@ -25,7 +24,7 @@
 #define VISION_BOOK_OUTPUT_MAX_CHARS 20
 #define VISION_CAMERA_FRAME_WIDTH  240
 #define VISION_CAMERA_FRAME_HEIGHT 240
-#define VISION_BOOK_OBFUSCATE_BLOCK_PX 8
+#define VISION_BOOK_OBFUSCATE_BLOCK_PX 12
 
 static bool appendChar(char *buf, size_t bufLen, size_t *pos, char c) {
   if (*pos + 1 >= bufLen) {
@@ -961,24 +960,10 @@ static VisionResult loadConfiguredVisionProvider(AiProvider *outProvider, char *
     return VISION_RESULT_UNSUPPORTED;
   }
 
-  int modelIndex = settings_api_get_model_index();
+  const int modelIndex = settings_api_get_model_index();
   if (!ai_provider_model_supports_vision(provider, modelIndex)) {
-    const char *selectedModel = ai_provider_model_id(provider, modelIndex);
-    bool foundVisionModel = false;
-    const int count = ai_provider_model_count(provider);
-    for (int i = 0; i < count; i++) {
-      if (ai_provider_model_supports_vision(provider, i)) {
-        modelIndex = i;
-        foundVisionModel = true;
-        break;
-      }
-    }
-    if (!foundVisionModel) {
-      Serial.printf("[Vision] model unsupported for vision: %s\r\n", selectedModel);
-      return VISION_RESULT_UNSUPPORTED;
-    }
-    Serial.printf("[Vision] model %s has no vision, using %s\r\n",
-                  selectedModel, ai_provider_model_id(provider, modelIndex));
+    Serial.printf("[Vision] model unsupported for vision: %s\r\n", settings_api_get_model_id());
+    return VISION_RESULT_UNSUPPORTED;
   }
 
   if (apiKey != nullptr && apiKeyLen > 0) {
@@ -988,7 +973,7 @@ static VisionResult loadConfiguredVisionProvider(AiProvider *outProvider, char *
     *outProvider = provider;
   }
   if (outModel != nullptr) {
-    *outModel = ai_provider_model_id(provider, modelIndex);
+    *outModel = settings_api_get_model_id();
   }
   return VISION_RESULT_OK;
 }
@@ -1017,10 +1002,150 @@ static VisionResult requestConfiguredVision(AiProvider provider, const char *api
 }
 
 static void chooseBookFallbackAnswer(char *outText, size_t outLen) {
+  static const char *kAnswers[] = {
+      "可以一试",
+      "先等等看",
+      "答案在路上",
+      "别急，会好的",
+      "换个方向",
+      "现在就开始",
+      "顺其自然",
+      "今天适合勇敢",
+      "再问一次心",
+      "保持好奇",
+      "会有惊喜",
+      "少想多做",
+      "听听直觉",
+      "风会带路",
+      "答案是肯定",
+      "暂时不是",
+      "慢慢来",
+      "去见重要的人",
+      "保留一点神秘",
+      "机会正在靠近",
+      "再靠近一点",
+      "先把灯打开",
+      "可以放心",
+      "不如暂停",
+      "选更简单的路",
+      "先睡一觉",
+      "明天会更清楚",
+      "你已经知道答案",
+      "向左看",
+      "向右试",
+      "别把门关死",
+      "留给时间",
+      "先说出口",
+      "不要逞强",
+      "是时候告别",
+      "先保护自己",
+      "值得等待",
+      "别等太久",
+      "现在还早",
+      "时机刚好",
+      "让它自然发生",
+      "去问那个人",
+      "别问所有人",
+      "相信第一次感觉",
+      "需要更诚实",
+      "答案藏在细节",
+      "先整理桌面",
+      "从小处开始",
+      "今天不宜冒进",
+      "可以大胆一点",
+      "退一步更好",
+      "往前一步",
+      "别回头太久",
+      "事情会转弯",
+      "它没有那么坏",
+      "你会被接住",
+      "再等等消息",
+      "主动会有回声",
+      "沉默也是答案",
+      "不必解释太多",
+      "先把水喝完",
+      "心软不是错",
+      "该拒绝就拒绝",
+      "可以答应",
+      "别急着答应",
+      "先看看代价",
+      "这次选自己",
+      "给它一个名字",
+      "放下旧问题",
+      "新答案在路上",
+      "不要低估自己",
+      "别把梦改小",
+      "今天适合开始",
+      "今天适合收尾",
+      "先完成一件事",
+      "问题会变轻",
+      "有人正在靠近",
+      "你需要休息",
+      "把话说清楚",
+      "别猜，去确认",
+      "再试一次",
+      "换个方式试",
+      "现在不是终点",
+      "允许它失败",
+      "它会自己打开",
+      "别急着证明",
+      "先守住边界",
+      "真相很温柔",
+      "真相有点刺",
+      "笑一下再决定",
+      "今天适合沉默",
+      "今天适合表达",
+      "跟着光走",
+      "离噪音远点",
+      "小心那个承诺",
+      "接受这个邀请",
+      "拒绝也可以",
+      "先别下结论",
+      "答案正在发芽",
+      "你没有错过",
+      "错过也没关系",
+      "别把爱当答案",
+      "钱会说明一部分",
+      "身体已经知道",
+      "不要再拖延",
+      "可以慢慢相信",
+      "这不是偶然",
+      "先把门留着",
+      "它值得认真",
+      "它不值得耗尽",
+      "去做那件小事",
+      "别让恐惧开车",
+      "会有人帮你",
+      "先独自走一段",
+      "等风停再说",
+      "趁风起出发",
+      "别忘了快乐",
+      "答案很朴素",
+      "复杂的先放下",
+      "先照顾心情",
+      "这是好兆头",
+      "还差一点勇气",
+      "你已经准备好",
+      "还需要证据",
+      "别急着删除",
+      "该更新计划了",
+      "问题不在你",
+      "问题需要时间",
+      "可以重新选择",
+      "别怕重新开始",
+      "先把窗打开",
+      "遇见会迟到",
+      "好事会变慢",
+      "这条路有人走过",
+      "答案在你手里",
+  };
+
   if (outText == nullptr || outLen == 0) {
     return;
   }
-  snprintf(outText, outLen, "%s", bookofanswers_random_timed());
+  const size_t count = sizeof(kAnswers) / sizeof(kAnswers[0]);
+  const size_t index = count > 0 ? (size_t)(esp_random() % count) : 0;
+  snprintf(outText, outLen, "%s", kAnswers[index]);
 }
 
 static uint8_t clampByte(int value) {
@@ -1254,7 +1379,7 @@ VisionResult vision_service_book_answer_jpeg(const uint8_t *jpeg, size_t jpegLen
   if (jpeg == nullptr || jpegLen == 0 || jpegLen > VISION_MAX_JPEG_BYTES) {
     Serial.printf("[Vision] book invalid jpeg len=%u, using local answer\r\n", (unsigned)jpegLen);
     chooseBookFallbackAnswer(outText, outLen);
-    return VISION_RESULT_LOCAL_FALLBACK;
+    return VISION_RESULT_OK;
   }
 
   char apiKey[129];
@@ -1262,8 +1387,9 @@ VisionResult vision_service_book_answer_jpeg(const uint8_t *jpeg, size_t jpegLen
   AiProvider provider = AI_PROVIDER_OPENAI;
   VisionResult ready = loadConfiguredVisionProvider(&provider, apiKey, sizeof(apiKey), &model);
   if (ready != VISION_RESULT_OK) {
-    Serial.printf("[Vision] book provider unavailable (%d)\r\n", (int)ready);
-    return ready;
+    Serial.printf("[Vision] book provider unavailable (%d), using local answer\r\n", (int)ready);
+    chooseBookFallbackAnswer(outText, outLen);
+    return VISION_RESULT_OK;
   }
 
   uint8_t *obfuscated = nullptr;
@@ -1271,7 +1397,7 @@ VisionResult vision_service_book_answer_jpeg(const uint8_t *jpeg, size_t jpegLen
   if (!obfuscateJpegForBook(jpeg, jpegLen, &obfuscated, &obfuscatedLen)) {
     Serial.println("[Vision] book obfuscation failed, using local answer");
     chooseBookFallbackAnswer(outText, outLen);
-    return VISION_RESULT_LOCAL_FALLBACK;
+    return VISION_RESULT_OK;
   }
 
   char *base64 = nullptr;
@@ -1280,7 +1406,7 @@ VisionResult vision_service_book_answer_jpeg(const uint8_t *jpeg, size_t jpegLen
     free(obfuscated);
     Serial.println("[Vision] book base64 encode failed, using local answer");
     chooseBookFallbackAnswer(outText, outLen);
-    return VISION_RESULT_LOCAL_FALLBACK;
+    return VISION_RESULT_OK;
   }
   free(obfuscated);
 
@@ -1299,14 +1425,14 @@ VisionResult vision_service_book_answer_jpeg(const uint8_t *jpeg, size_t jpegLen
   if (result != VISION_RESULT_OK || outText[0] == '\0') {
     Serial.printf("[Vision] book request failed (%d), using local answer\r\n", (int)result);
     chooseBookFallbackAnswer(outText, outLen);
-    return VISION_RESULT_LOCAL_FALLBACK;
+    return VISION_RESULT_OK;
   }
 
   trimVisionOutput(outText);
   if (bookAnswerLooksLikeTitle(outText)) {
     Serial.printf("[Vision] book title-like answer '%s', using local answer\r\n", outText);
     chooseBookFallbackAnswer(outText, outLen);
-    return VISION_RESULT_LOCAL_FALLBACK;
+    return VISION_RESULT_OK;
   }
 
   truncateVisionOutput(outText, VISION_BOOK_OUTPUT_MAX_CHARS);

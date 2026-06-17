@@ -42,7 +42,7 @@ Boot log should show `[Camera] ready (240x240 JPEG)` and non-zero `freePsram`.
 |------|--------|
 | Weather | QWeather forecast, metrics, AQI/UV, 3-day outlook (tomorrow onward) |
 | **AI Vision** | Camera capture + cloud poetic description (≤40 Chinese chars); eye icon on launcher |
-| **Answers** | Book of Answers app with photo oracle, obfuscated upload, and local random answers |
+| **Answers** | Local Book of Answers app with photo, voice, and automatic oracle modes |
 | Stocks | Watchlist quotes and change preview |
 | Settings | WiFi, **QWeather key/host**, AI provider/model/API key, Display, About; gear icon on launcher; EN/ZH |
 
@@ -70,10 +70,10 @@ Configure API key via captive portal or **Settings → Model**. MiMo keys often 
 
 ### Answers
 
-- Open the **Answers / 答案之书** launcher app. Press **A short press** (serial `n`) to switch between **photo oracle** and **local random answer**, then press **B** to confirm.
-- In photo oracle mode, the app shows a mosaic camera preview. Press **A short press** to capture; the firmware uploads only a pixel-obfuscated JPEG and asks the configured vision provider for a Book of Answers style response.
-- Responses are truncated to 20 UTF-8 characters on-device.
-- If WiFi is offline, the API key is missing, the provider/model is unavailable, image obfuscation fails, or the API request fails, the app falls back to the built-in local answer list instead of blocking on an error.
+- Open the **Answers / 答案之书** launcher app. Press **A short press** (serial `n`) to switch between **photo oracle**, **voice oracle**, and **automatic oracle**, then press **B** (serial `c`) to confirm.
+- Photo oracle shows a direct black/white preview and uses the captured JPEG bytes only as a local seed. It does not upload the image or call the vision provider.
+- Voice oracle records a short local microphone sample and hashes its energy pattern into a seed. Automatic oracle uses device entropy and time.
+- Results come from the built-in humorous answer list, so this app works offline and does not require an API key.
 
 ### Voice Interaction
 
@@ -110,7 +110,7 @@ With `BTN_SERIAL_SIM=1` in `btn_input.h`:
 
 | Key | Action |
 |-----|--------|
-| n | A click (next / **capture in AI Vision or Answers photo mode**) |
+| n | A click (next / **capture in AI Vision; switch or capture in Answers**) |
 | p | A double (prev) |
 | b | A long (back) |
 | c | B confirm |
@@ -162,7 +162,7 @@ python tools/png_to_tile_icons.py
 ```
 
 - Weather icons: rasterize `wi-*.svg` → `weather_icons.h` (16×16).
-- Launcher icons: **`tile_clock.svg`**, **`tile_weather.svg`**, **`tile_camera.svg`**, **`tile_answerbook.svg`**, **`tile_stock.svg`**, and **`tile_settings.svg`** are committed source assets. Run `png_to_tile_icons.py` → `settings_icons.h` (32×32 1-bit bitmaps for all launcher tiles).
+- Launcher icons: **`stock.svg`** is committed; place **`gear.png`** and **`eye.png`** in the sketch root (local only; gitignored). Run `png_to_tile_icons.py` → `settings_icons.h` (32×32 outline bitmaps for all launcher tiles).
 
 ## Project layout
 
