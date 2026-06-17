@@ -1329,8 +1329,11 @@ static void refreshMainUiOnDisplay(UiRefreshMode mode) {
   }
 
   const bool fullInit = (mode == UI_REFRESH_FULL);
-  const bool fastEpd = (mode == UI_REFRESH_FAST || mode == UI_REFRESH_NAV);
-  const bool fullLvgl = (mode != UI_REFRESH_FAST);
+  const bool fastEpd = (mode == UI_REFRESH_FAST ||
+                        mode == UI_REFRESH_PREVIEW ||
+                        mode == UI_REFRESH_NAV);
+  const bool fullLvgl = (mode != UI_REFRESH_FAST &&
+                         mode != UI_REFRESH_PREVIEW);
 
   if (mode == UI_REFRESH_QUALITY || mode == UI_REFRESH_FULL) {
     if (ui_nav_is_weather()) {
@@ -1406,6 +1409,7 @@ static int refreshModePriority(UiRefreshMode mode) {
       return 3;
     case UI_REFRESH_NAV:
       return 2;
+    case UI_REFRESH_PREVIEW:
     case UI_REFRESH_FAST:
       return 1;
     default:
@@ -1419,6 +1423,8 @@ static UiRefreshMode strongerRefreshMode(UiRefreshMode a, UiRefreshMode b) {
 
 static const char *refreshModeName(UiRefreshMode mode) {
   switch (mode) {
+    case UI_REFRESH_PREVIEW:
+      return "FAST";
     case UI_REFRESH_FAST:
       return "FAST";
     case UI_REFRESH_NAV:
@@ -1438,12 +1444,23 @@ static void requestDisplayRefresh(UiRefreshMode mode) {
   }
 
   const unsigned long now = millis();
+  const bool previewRequest = (mode == UI_REFRESH_PREVIEW);
   if (!displayRefreshPending) {
     displayRefreshPending = true;
     pendingDisplayRefreshMode = mode;
     pendingDisplayRequestCount = 1;
     pendingDisplaySinceMs = now;
+  } else if (previewRequest) {
+    if (refreshModePriority(pendingDisplayRefreshMode) <= refreshModePriority(UI_REFRESH_PREVIEW)) {
+      pendingDisplayRefreshMode = UI_REFRESH_PREVIEW;
+      pendingDisplayRequestCount = 1;
+    }
   } else {
+    if (pendingDisplayRefreshMode == UI_REFRESH_PREVIEW && mode == UI_REFRESH_FAST) {
+      pendingDisplayRefreshMode = UI_REFRESH_FAST;
+      pendingDisplayRequestCount = 1;
+      return;
+    }
     pendingDisplayRequestCount++;
     pendingDisplayRefreshMode = strongerRefreshMode(pendingDisplayRefreshMode, mode);
     if (pendingDisplayRefreshMode == UI_REFRESH_FAST && pendingDisplayRequestCount > 1) {

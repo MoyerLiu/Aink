@@ -14,6 +14,8 @@
 #include <string.h>
 
 #define ANSWERS_TASK_STACK_BYTES       16384
+#define ANSWERS_PREVIEW_TASK_STACK_BYTES 12288
+#define ANSWERS_PREVIEW_MS            800U
 #define ANSWERS_PREVIEW_FRAME_X        49
 #define ANSWERS_PREVIEW_FRAME_Y        55
 #define ANSWERS_PREVIEW_FRAME_SIZE     102
@@ -56,6 +58,7 @@ static AnswersMode s_selectedMode = ANSWERS_MODE_CAMERA;
 static AnswersMode s_activeMode = ANSWERS_MODE_AUTO;
 static bool s_busy = false;
 static TaskHandle_t s_askTask = nullptr;
+static TaskHandle_t s_previewTask = nullptr;
 static portMUX_TYPE s_resultMux = portMUX_INITIALIZER_UNLOCKED;
 static bool s_visible = false;
 static bool s_resultReady = false;
@@ -63,9 +66,18 @@ static AnswersLocalResult s_resultCode = ANSWERS_LOCAL_TASK_FAIL;
 static char s_resultMain[40];
 static char s_resultSub[96];
 static uint16_t s_resultNumber = 0;
+static bool s_previewEnabled = false;
+static bool s_previewFrozen = false;
+static bool s_previewHasFrame = false;
+static uint32_t s_previewSeq = 0;
+static uint32_t s_previewAppliedSeq = 0;
+static uint8_t s_previewBits[CAMERA_PREVIEW_BYTES];
 static char s_currentMain[40];
 static char s_currentSub[96];
 static char s_currentFooter[40];
+
+static void answersPreviewTask(void *param);
+static void ensurePreviewTask(void);
 
 static void styleLabel(lv_obj_t *label, const lv_font_t *font) {
   lv_obj_set_style_text_color(label, lv_color_black(), LV_PART_MAIN);
@@ -149,6 +161,39 @@ static void copyPickedAnswer(uint32_t seed, AnswersMode mode,
   }
 }
 
+static void setPreviewState(bool enabled, bool frozen) {
+  portENTER_CRITICAL(&s_resultMux);
+  s_previewEnabled = enabled;
+  s_previewFrozen = frozen;
+  portEXIT_CRITICAL(&s_resultMux);
+}
+
+static bool previewCaptureAllowed(void) {
+  bool allowed = false;
+  portENTER_CRITICAL(&s_resultMux);
+  allowed = s_visible && s_previewEnabled && !s_previewFrozen &&
+            !s_busy && s_view == ANSWERS_VIEW_CAMERA;
+  portEXIT_CRITICAL(&s_resultMux);
+  return allowed;
+}
+
+static bool ensurePreviewCameraReady(void) {
+  if (!camera_service_lock(500)) {
+    Serial.println("[Answers] preview camera busy");
+    return false;
+  }
+  const bool ready = camera_service_start_preview();
+  camera_service_unlock();
+  return ready;
+}
+
+static void pausePreviewCamera(void) {
+  if (camera_service_lock(300)) {
+    camera_service_pause();
+    camera_service_unlock();
+  }
+}
+
 static bool ensurePreviewBuffer(void) {
   if (s_previewBuf != nullptr) {
     return true;
@@ -180,6 +225,9 @@ static void clearPreviewCanvas(void) {
     }
   }
   lv_obj_invalidate(s_previewCanvas);
+  if (s_previewFrame != nullptr) {
+    lv_obj_invalidate(s_previewFrame);
+  }
 }
 
 static void applyPreviewBits(const uint8_t *bits) {
@@ -201,37 +249,93 @@ static void applyPreviewBits(const uint8_t *bits) {
   }
 }
 
-static bool capturePreviewFrame(void) {
+static void storePreviewBits(const uint8_t *bits, bool alreadyApplied) {
+  if (bits == nullptr) {
+    return;
+  }
+
+  portENTER_CRITICAL(&s_resultMux);
+  memcpy(s_previewBits, bits, CAMERA_PREVIEW_BYTES);
+  s_previewHasFrame = true;
+  s_previewSeq++;
+  if (alreadyApplied) {
+    s_previewAppliedSeq = s_previewSeq;
+  }
+  portEXIT_CRITICAL(&s_resultMux);
+}
+
+static bool consumePreviewFrame(void) {
   uint8_t bits[CAMERA_PREVIEW_BYTES];
+  bool hasFrame = false;
 
-  if (s_previewCanvas == nullptr) {
+  portENTER_CRITICAL(&s_resultMux);
+  if (s_previewHasFrame && s_previewSeq != s_previewAppliedSeq) {
+    memcpy(bits, s_previewBits, CAMERA_PREVIEW_BYTES);
+    s_previewAppliedSeq = s_previewSeq;
+    hasFrame = true;
+  }
+  portEXIT_CRITICAL(&s_resultMux);
+
+  if (!hasFrame) {
     return false;
   }
-  if (!camera_service_lock(500)) {
-    Serial.println("[Answers] preview skipped: camera busy");
-    return false;
-  }
+  applyPreviewBits(bits);
+  return true;
+}
 
-  bool ok = false;
-  camera_fb_t *fb = nullptr;
-  if (camera_service_is_ready() || camera_service_init()) {
-    fb = camera_service_capture();
-    if (fb != nullptr) {
-      ok = camera_service_frame_to_mono_preview100(fb, bits, sizeof(bits));
-      camera_service_release(fb);
+static void answersPreviewTask(void *param) {
+  (void)param;
+
+  uint8_t bits[CAMERA_PREVIEW_BYTES];
+  TickType_t lastWake = xTaskGetTickCount();
+
+  for (;;) {
+    vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(ANSWERS_PREVIEW_MS));
+
+    if (!previewCaptureAllowed()) {
+      continue;
+    }
+    if (!camera_service_lock(30)) {
+      continue;
+    }
+
+    bool ok = false;
+    if (previewCaptureAllowed() &&
+        camera_service_is_ready() &&
+        camera_service_mode() == CAMERA_SERVICE_MODE_PREVIEW) {
+      camera_fb_t *fb = camera_service_capture();
+      if (fb != nullptr) {
+        ok = camera_service_frame_to_mono_preview100(fb, bits, sizeof(bits));
+        camera_service_release(fb);
+      }
+    }
+    camera_service_unlock();
+
+    if (ok) {
+      storePreviewBits(bits, false);
     }
   }
-  camera_service_pause();
-  camera_service_unlock();
+}
 
-  if (ok) {
-    applyPreviewBits(bits);
+static void ensurePreviewTask(void) {
+  if (s_previewTask != nullptr) {
+    return;
   }
-  return ok;
+  if (xTaskCreate(answersPreviewTask, "abprev",
+                  ANSWERS_PREVIEW_TASK_STACK_BYTES, nullptr, 1,
+                  &s_previewTask) != pdPASS) {
+    s_previewTask = nullptr;
+    Serial.println("[Answers] preview task create failed");
+  }
 }
 
 static void showMenu(void) {
+  const bool leavingCamera = s_view == ANSWERS_VIEW_CAMERA;
   s_view = ANSWERS_VIEW_MENU;
+  setPreviewState(false, false);
+  if (leavingCamera && !ui_answers_is_busy()) {
+    pausePreviewCamera();
+  }
   setHidden(s_previewFrame, true);
   setHidden(s_answerLabel, true);
   setHidden(s_answerSubLabel, true);
@@ -252,7 +356,10 @@ static void showMenu(void) {
 }
 
 static void showCamera(void) {
+  const bool entering = s_view != ANSWERS_VIEW_CAMERA;
   s_view = ANSWERS_VIEW_CAMERA;
+  ensurePreviewTask();
+  setPreviewState(ensurePreviewCameraReady(), false);
   for (int i = 0; i < ANSWERS_MODE_COUNT; i++) {
     setHidden(s_optionLabels[i], true);
   }
@@ -262,13 +369,15 @@ static void showCamera(void) {
 
   lv_label_set_text(s_titleLabel, answersModeTitle(ANSWERS_MODE_CAMERA));
   lv_label_set_text(s_hintLabel, "A/B拍摄，表情不用太庄严");
-  clearPreviewCanvas();
-  (void)capturePreviewFrame();
+  if (entering) {
+    clearPreviewCanvas();
+  }
   lv_obj_invalidate(s_screenAnswers);
 }
 
 static void showBusy(AnswersMode mode) {
   s_view = ANSWERS_VIEW_BUSY;
+  setPreviewState(mode == ANSWERS_MODE_CAMERA, true);
   for (int i = 0; i < ANSWERS_MODE_COUNT; i++) {
     setHidden(s_optionLabels[i], true);
   }
@@ -283,6 +392,7 @@ static void showBusy(AnswersMode mode) {
 
 static void showResult(const char *mainText, const char *subText, const char *footer) {
   s_view = ANSWERS_VIEW_RESULT;
+  setPreviewState(false, false);
   setHidden(s_previewFrame, true);
   for (int i = 0; i < ANSWERS_MODE_COUNT; i++) {
     setHidden(s_optionLabels[i], true);
@@ -333,7 +443,7 @@ static AnswersLocalResult captureImageSeed(uint32_t *outSeed) {
   AnswersLocalResult status = ANSWERS_LOCAL_CAMERA_FAIL;
   camera_fb_t *fb = nullptr;
 
-  if (!camera_service_is_ready() && !camera_service_init()) {
+  if (!camera_service_start_photo()) {
     status = ANSWERS_LOCAL_CAMERA_FAIL;
   } else {
     camera_fb_t *warmup = camera_service_capture();
@@ -520,6 +630,7 @@ void ui_answers_init(void) {
   lv_label_set_long_mode(s_hintLabel, LV_LABEL_LONG_DOT);
   lv_obj_align(s_hintLabel, LV_ALIGN_BOTTOM_MID, 0, -8);
 
+  ensurePreviewTask();
   showMenu();
 }
 
@@ -540,11 +651,9 @@ void ui_answers_leave(void) {
   portENTER_CRITICAL(&s_resultMux);
   s_visible = false;
   portEXIT_CRITICAL(&s_resultMux);
+  setPreviewState(false, false);
   if (!ui_answers_is_busy()) {
-    if (camera_service_lock(300)) {
-      camera_service_pause();
-      camera_service_unlock();
-    }
+    pausePreviewCamera();
   }
 }
 
@@ -675,6 +784,17 @@ bool ui_answers_service(UiRefreshMode *outRefreshMode) {
     }
     Serial.printf("[Answers] pipeline done code=%d\r\n", (int)code);
     return ui_answers_is_active();
+  }
+
+  if (ui_answers_is_active() && s_view == ANSWERS_VIEW_CAMERA &&
+      !ui_answers_is_busy()) {
+    if (!consumePreviewFrame()) {
+      return false;
+    }
+    if (outRefreshMode != nullptr) {
+      *outRefreshMode = UI_REFRESH_PREVIEW;
+    }
+    return true;
   }
 
   return false;
