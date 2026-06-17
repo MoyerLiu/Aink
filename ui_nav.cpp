@@ -213,6 +213,9 @@ bool ui_nav_handle(BtnAction action, UiRefreshMode *outRefreshMode) {
   if (ui_vision_is_active()) {
     switch (action) {
       case BTN_ACTION_NEXT:
+        if (ui_answers_is_busy()) {
+          return false;
+        }
         if (ui_vision_request_capture()) {
           ui_vision_set_busy();
           if (outRefreshMode != nullptr) {
@@ -235,6 +238,9 @@ bool ui_nav_handle(BtnAction action, UiRefreshMode *outRefreshMode) {
     switch (action) {
       case BTN_ACTION_NEXT:
       {
+        if (ui_vision_is_busy()) {
+          return false;
+        }
         UiRefreshMode answerMode = UI_REFRESH_NONE;
         if (ui_answers_next(&answerMode)) {
           if (outRefreshMode != nullptr) {
